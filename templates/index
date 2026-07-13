@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nassau Candy · Route Efficiency Intelligence</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">🍬</div>
+      <div class="brand-text"><b>Nassau Candy</b><span>Route Intelligence</span></div>
+    </div>
+
+    <div class="nav-group-label">Overview</div>
+    <div class="navitem active" data-page="dashboard"><span class="ico">▤</span><span class="lbl">Dashboard</span><span class="kbd">1</span></div>
+    <div class="navitem" data-page="upload"><span class="ico">⇪</span><span class="lbl">Upload Dataset</span><span class="kbd">2</span></div>
+
+    <div class="nav-group-label">Analysis</div>
+    <div class="navitem" data-page="routes"><span class="ico">⇄</span><span class="lbl">Route Analysis</span><span class="kbd">3</span></div>
+    <div class="navitem" data-page="distance"><span class="ico">◎</span><span class="lbl">Distance Analysis</span><span class="kbd">4</span></div>
+    <div class="navitem" data-page="efficiency"><span class="ico">⚡</span><span class="lbl">Efficiency Analysis</span><span class="kbd">5</span></div>
+    <div class="navitem" data-page="map"><span class="ico">🗺</span><span class="lbl">Interactive Map</span><span class="kbd">6</span></div>
+
+    <div class="nav-group-label">Entities</div>
+    <div class="navitem" data-page="factories"><span class="ico">🏭</span><span class="lbl">Factories</span><span class="kbd">7</span></div>
+    <div class="navitem" data-page="customers"><span class="ico">👥</span><span class="lbl">Customers</span><span class="kbd">8</span></div>
+
+    <div class="nav-group-label">Insights</div>
+    <div class="navitem" data-page="analytics"><span class="ico">📈</span><span class="lbl">Analytics</span><span class="kbd">9</span></div>
+    <div class="navitem" data-page="reports"><span class="ico">▧</span><span class="lbl">Reports</span><span class="kbd">0</span></div>
+
+    <div class="nav-group-label">System</div>
+    <div class="navitem" data-page="settings"><span class="ico">⚙</span><span class="lbl">Settings</span></div>
+
+    <div class="sidebar-foot">
+      <button class="collapse-btn" id="collapseBtn">⇤ Collapse</button>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="mobileToggle" style="display:none">☰</button>
+      <div class="crumb"><span>Nassau Candy</span> / <b id="crumbPage">Dashboard</b></div>
+      <span class="badge badge-blue" id="crumbSource" style="margin-left:2px;">Sample Data</span>
+      <div class="searchbar" id="openPalette">
+        <span>🔍</span><span>Search shipments, factories, customers…</span><span class="kbd">Ctrl K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
+        <button class="icon-btn" id="notifBtn" title="Notifications"><span class="dot"></span>🔔</button>
+        <div class="avatar" title="Nassau Candy Admin">NC</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div><div class="page-title">Dashboard</div><div class="page-sub">Live overview of factory-to-customer shipping performance</div></div>
+          <div class="head-actions">
+            <button class="btn btn-ghost btn-sm" id="dashRefresh">↻ Refresh</button>
+            <button class="btn btn-primary btn-sm" id="dashExport">⬇ Export Snapshot</button>
+          </div>
+        </div>
+
+        <div id="globalFilterMount"></div>
+
+        <div class="grid g-4" id="kpiGrid" style="margin-bottom:18px;"></div>
+
+        <div class="grid g-2" style="margin-bottom:18px;">
+          <div class="card">
+            <div class="card-title"><span class="t">📊 Shipping Volume &amp; Efficiency Trend<span class="sub">last 12 weeks</span></span></div>
+            <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="t">🚚 Ship Mode Mix</span></div>
+            <div class="chart-wrap"><canvas id="chartShipMode"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid g-2">
+          <div class="card">
+            <div class="card-title"><span class="t">🏆 Top &amp; Bottom Routes by Efficiency</span></div>
+            <div class="chart-wrap"><canvas id="chartRouteRank"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="t">⚠️ Attention Needed</span></div>
+            <div id="attentionList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ UPLOAD ============ -->
+      <section class="page" id="page-upload">
+        <div class="page-head">
+          <div><div class="page-title">Upload Dataset</div><div class="page-sub">Drag &amp; drop a CSV to replace the working dataset, or keep the generated Nassau Candy sample</div></div>
+        </div>
+
+        <div class="grid g-2" style="align-items:start;">
+          <div class="card">
+            <div class="dropzone" id="dropzone">
+              <div class="dz-icon">⇪</div>
+              <div class="dz-title">Drop your CSV file here</div>
+              <div class="dz-sub">or click to browse · columns are auto-detected — works with Order/Ship Date, Ship Mode, Customer, Division, Region, Product, Sales, Units, Cost, Gross Profit schemas, plant/lat-lng schemas, or a mix. Anything not found is shown as N/A, never invented.</div>
+              <input type="file" id="fileInput" accept=".csv" style="display:none">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px;">
+              <button class="btn btn-ghost btn-sm" id="downloadTemplate">⬇ Download CSV Template</button>
+              <button class="btn btn-ghost btn-sm" id="resetToSample">↺ Reset to Sample Data (500 records)</button>
+            </div>
+            <div id="validationReport" style="margin-top:18px;"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="t">👁 Data Preview</span><span class="sub" id="previewCount"></span></div>
+            <div class="table-scroll" style="max-height:480px;">
+              <table id="previewTable"><thead></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ROUTE ANALYSIS ============ -->
+      <section class="page" id="page-routes">
+        <div class="page-head">
+          <div><div class="page-title">Route Analysis</div><div class="page-sub">Every Factory → Region route ranked by volume, cost and lead time</div></div>
+          <div class="head-actions"><button class="btn btn-ghost btn-sm" id="routesExport">⬇ Export CSV</button></div>
+        </div>
+        <div id="routesFilterMount"></div>
+        <div class="card">
+          <div class="table-toolbar">
+            <input type="search" id="routeSearch" placeholder="Search routes…" style="width:240px;">
+            <span class="badge badge-blue" id="routeCountBadge">0 routes</span>
+          </div>
+          <div class="table-scroll"><table id="routeTable"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ DISTANCE ANALYSIS ============ -->
+      <section class="page" id="page-distance">
+        <div class="page-head"><div><div class="page-title">Distance Analysis</div><div class="page-sub">Shipping distance distribution and its relationship to cost &amp; lead time</div></div></div>
+        <div class="grid g-3" style="margin-bottom:18px;">
+          <div class="card kpi"><div class="kpi-label">Avg Distance</div><div class="kpi-value" id="distAvg">–</div><div class="kpi-icon">📏</div></div>
+          <div class="card kpi"><div class="kpi-label">Longest Route</div><div class="kpi-value" id="distMax">–</div><div class="kpi-icon">🛣</div></div>
+          <div class="card kpi"><div class="kpi-label">Shortest Route</div><div class="kpi-value" id="distMin">–</div><div class="kpi-icon">📍</div></div>
+        </div>
+        <div class="grid g-2">
+          <div class="card"><div class="card-title"><span class="t">📉 Distance vs. Cost</span><span class="sub">each point = one shipment</span></div><div class="chart-wrap"><canvas id="chartDistCost"></canvas></div></div>
+          <div class="card"><div class="card-title"><span class="t">📊 Distance Buckets</span></div><div class="chart-wrap"><canvas id="chartDistBuckets"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- ============ EFFICIENCY ANALYSIS ============ -->
+      <section class="page" id="page-efficiency">
+        <div class="page-head"><div><div class="page-title">Efficiency Analysis</div><div class="page-sub">Route Efficiency Score = normalized blend of lead-time, cost-per-km and on-time performance</div></div></div>
+        <div class="grid g-3" style="margin-bottom:18px;">
+          <div class="card kpi"><div class="kpi-label">Fleet Efficiency</div><div class="kpi-value" id="effAvg">–</div><div class="kpi-icon">⚡</div></div>
+          <div class="card kpi"><div class="kpi-label">On-Time Rate</div><div class="kpi-value" id="effOnTime">–</div><div class="kpi-icon">✅</div></div>
+          <div class="card kpi"><div class="kpi-label">Late Deliveries</div><div class="kpi-value" id="effLate">–</div><div class="kpi-icon">⏰</div></div>
+        </div>
+        <div class="grid g-2">
+          <div class="card"><div class="card-title"><span class="t">🏅 Route Efficiency Ranking</span></div><div class="chart-wrap" style="height:360px;"><canvas id="chartEffRank"></canvas></div></div>
+          <div class="card"><div class="card-title"><span class="t">🎯 Ship Mode Performance (Radar)</span></div><div class="chart-wrap"><canvas id="chartRadar"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- ============ MAP ============ -->
+      <section class="page" id="page-map">
+        <div class="page-head"><div><div class="page-title">Interactive Map</div><div class="page-sub">Factory hubs, customer destinations and live route lines</div></div></div>
+        <div class="filterbar">
+          <div class="fgroup"><label>Factory</label><select id="mapFactoryFilter"><option value="all">All Factories</option></select></div>
+          <div class="fgroup"><label>Ship Mode</label><select id="mapModeFilter"><option value="all">All Modes</option></select></div>
+          <div class="fgroup"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" id="mapReset">↺ Reset View</button></div>
+        </div>
+        <div class="card"><div id="map"></div>
+          <div class="map-legend">
+            <span><i style="background:#2563EB"></i> Factory</span>
+            <span><i style="background:#22C55E"></i> On-time route</span>
+            <span><i style="background:#EF4444"></i> Delayed route</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ FACTORIES ============ -->
+      <section class="page" id="page-factories">
+        <div class="page-head"><div><div class="page-title">Factory Information</div><div class="page-sub">Production hub performance overview</div></div></div>
+        <div class="grid g-3" id="factoryGrid"></div>
+      </section>
+
+      <!-- ============ CUSTOMERS ============ -->
+      <section class="page" id="page-customers">
+        <div class="page-head">
+          <div><div class="page-title">Customer Information</div><div class="page-sub">Delivery destinations across every region served</div></div>
+          <div class="head-actions"><button class="btn btn-ghost btn-sm" id="custExport">⬇ Export CSV</button></div>
+        </div>
+        <div class="card">
+          <div class="table-toolbar"><input type="search" id="custSearch" placeholder="Search customers or cities…" style="width:260px;"></div>
+          <div class="table-scroll"><table id="custTable"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- ============ ANALYTICS ============ -->
+      <section class="page" id="page-analytics">
+        <div class="page-head"><div><div class="page-title">Analytics</div><div class="page-sub">Deeper cross-cuts of the shipping dataset</div></div></div>
+        <div class="grid g-2" style="margin-bottom:18px;">
+          <div class="card"><div class="card-title"><span class="t">💰 Avg Cost by Region</span></div><div class="chart-wrap"><canvas id="chartRegionCost"></canvas></div></div>
+          <div class="card"><div class="card-title"><span class="t">🍫 Volume by Division</span></div><div class="chart-wrap"><canvas id="chartDivision"></canvas></div></div>
+        </div>
+        <div class="grid g-2">
+          <div class="card"><div class="card-title"><span class="t">📆 Delivery Days Distribution</span></div><div class="chart-wrap"><canvas id="chartLeadHist"></canvas></div></div>
+          <div class="card">
+            <div class="card-title"><span class="t">🔥 Region × Ship Mode Avg Cost/km</span></div>
+            <div id="heatmapMount"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ REPORTS ============ -->
+      <section class="page" id="page-reports">
+        <div class="page-head"><div><div class="page-title">Reports</div><div class="page-sub">Generate and export analysis-ready reports</div></div></div>
+        <div class="grid g-3" style="margin-bottom:18px;">
+          <div class="card">
+            <div class="card-title"><span class="t">📄 Executive Summary</span></div>
+            <p style="font-size:13px;color:var(--text-dim);line-height:1.7;">A one-page overview of fleet KPIs, top &amp; bottom routes, and recommended actions — formatted for stakeholders.</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px;" id="genSummary">Generate &amp; Print</button>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="t">📊 Full Dataset (CSV)</span></div>
+            <p style="font-size:13px;color:var(--text-dim);line-height:1.7;">Export the complete, currently-filtered shipment dataset as CSV for further analysis.</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px;" id="genCSV">Export CSV</button>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="t">📈 Full Dataset (Excel)</span></div>
+            <p style="font-size:13px;color:var(--text-dim);line-height:1.7;">Export the complete dataset plus a route-summary sheet as a multi-tab .xlsx workbook.</p>
+            <button class="btn btn-primary btn-sm" style="margin-top:12px;" id="genXLSX">Export Excel</button>
+          </div>
+        </div>
+        <div class="card" id="reportPreview">
+          <div class="empty"><div class="e-ico">▧</div>Generate a report above to preview it here.</div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="page-head"><div><div class="page-title">Settings</div><div class="page-sub">Personalize the workspace</div></div></div>
+        <div class="card" style="max-width:640px;">
+          <div class="settings-row">
+            <div class="l"><b>Dark Mode</b><span>Switch between light and dark interface themes</span></div>
+            <div class="switch" id="settingsThemeSwitch"><i></i></div>
+          </div>
+          <div class="settings-row">
+            <div class="l"><b>Currency</b><span>Display currency for cost figures across the app</span></div>
+            <select id="currencySelect"><option value="USD">USD $</option><option value="EUR">EUR €</option><option value="GBP">GBP £</option><option value="CAD">CAD $</option></select>
+          </div>
+          <div class="settings-row">
+            <div class="l"><b>Animation Speed</b><span>Tune how snappy transitions and motion feel</span></div>
+            <input type="range" class="range-input" id="animSpeed" min="0.4" max="1.8" step="0.1" value="1">
+          </div>
+          <div class="settings-row">
+            <div class="l"><b>Compact Sidebar</b><span>Collapse the sidebar to icons only</span></div>
+            <div class="switch" id="settingsSidebarSwitch"><i></i></div>
+          </div>
+          <div class="settings-row">
+            <div class="l"><b>Reset Preferences</b><span>Restore all settings and filters to their defaults</span></div>
+            <button class="btn btn-ghost btn-sm" id="resetPrefs">Reset</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- Command Palette -->
+<div class="overlay" id="paletteOverlay">
+  <div class="cmdk">
+    <div class="cmdk-input"><span>🔍</span><input type="text" id="paletteInput" placeholder="Type a command or search…" autocomplete="off"></div>
+    <div class="cmdk-list" id="paletteList"></div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
